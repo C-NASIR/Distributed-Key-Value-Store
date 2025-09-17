@@ -1,13 +1,14 @@
 package store
 
 import (
+	"encoding/json"
 	"strconv"
 	"sync"
 	"time"
 )
 
 type entry struct {
-	value     string
+	value     []byte
 	expiresAt time.Time
 }
 
@@ -29,7 +30,7 @@ func NewStore() *Store {
 func (s *Store) Set(key, value string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.data[key] = entry{value: value}
+	s.data[key] = entry{value: []byte(value)}
 	return nil
 }
 
@@ -37,7 +38,7 @@ func (s *Store) SetWithTTL(key, value string, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data[key] = entry{
-		value:     value,
+		value:     []byte(value),
 		expiresAt: time.Now().Add(ttl),
 	}
 	return nil
@@ -51,10 +52,33 @@ func (s *Store) Get(key string) (string, bool) {
 		return "", false
 	}
 	if !e.expiresAt.IsZero() && time.Now().After(e.expiresAt) {
-		// expired
 		return "", false
 	}
-	return e.value, true
+	return string(e.value), true
+}
+
+func (s *Store) SetObject(key string, val any) error {
+	b, err := json.Marshal(val)
+	if err != nil {
+		return  err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[key] = entry{value: b}
+	return nil
+}
+
+func (s *Store) GetObject(key string, target any) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	e, ok := s.data[key]
+	if !ok || (!e.expiresAt.IsZero() && time.Now().After(e.expiresAt)) {
+		return false, nil
+	}
+	if error := json.Unmarshal(e.value, target); error != nil {
+		return  false, error
+	}
+	return true, nil
 }
 
 func (s *Store) Delete(key string) bool {
@@ -112,37 +136,40 @@ func (s *Store) Close() {
 func (s *Store) Incr(key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	e, ok := s.data[key]
 	if !ok {
-		s.data[key] = entry{value: "1"}
+		s.data[key] = entry{value: []byte("1")}
 		return nil
 	}
 
-	n, err := strconv.Atoi(e.value)
+	n, err := strconv.Atoi(string(e.value))
 	if err != nil {
-		return  err
+		return err
 	}
-
 	n++
-	e.value = strconv.Itoa(n)
+	e.value = []byte(strconv.Itoa(n))
 	s.data[key] = e
-	return  nil
+	return nil
 }
 
+
 func (s *Store) Decr(key string) error {
-		s.mu.Lock()
+	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	e, ok := s.data[key]
 	if !ok {
-		s.data[key] = entry{value: "-1"}
+		s.data[key] = entry{value: []byte("-1")}
 		return nil
 	}
-	n, err := strconv.Atoi(e.value)
+
+	n, err := strconv.Atoi(string(e.value))
 	if err != nil {
 		return err
 	}
 	n--
-	e.value = strconv.Itoa(n)
+	e.value = []byte(strconv.Itoa(n))
 	s.data[key] = e
 	return nil
 }
@@ -150,11 +177,13 @@ func (s *Store) Decr(key string) error {
 func (s *Store) CAS(key, expected, newVal string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	e, ok := s.data[key]
-	if !ok || e.value != expected {
-		return  false
+	if !ok || string(e.value) != expected {
+		return false
 	}
-	e.value = newVal
-	s.data[key] = e 
-	return  true
+
+	e.value = []byte(newVal)
+	s.data[key] = e
+	return true
 }

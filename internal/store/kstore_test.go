@@ -136,3 +136,30 @@ func TestCAS(t *testing.T) {
 		t.Fatalf("CAS should fail when expected does not match")
 	}
 }
+
+func TestSetAndGetObject(t *testing.T) {
+	type User struct {
+		Name string 
+		Age int 
+	}
+
+	s := NewStore()
+	u := User{Name: "Alice", Age: 30}
+
+	if err := s.SetObject("user1", u); err != nil {
+		t.Fatalf("SetObject error: %v", err)
+	}
+
+	var out User
+	ok, err := s.GetObject("user1", &out)
+	if err != nil {
+		t.Fatalf("GetObject error: %v", err)
+	}
+
+	if !ok {
+		t.Fatalf("expected key to exist")
+	}
+	if out.Name != "Alice" || out.Age != 30 {
+		t.Fatalf("unexpected data: %+v", out)
+	}
+}
