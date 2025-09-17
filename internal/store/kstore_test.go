@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -161,5 +162,36 @@ func TestSetAndGetObject(t *testing.T) {
 	}
 	if out.Name != "Alice" || out.Age != 30 {
 		t.Fatalf("unexpected data: %+v", out)
+	}
+}
+
+
+func TestPersistenceSaveAndLoad(t *testing.T) {
+	s := NewStore()
+	s.SetWithTTL("a", "1", 2 * time.Second)
+	s.Set("b", "hello")
+
+	file := "testdb.json"
+	defer os.Remove(file)
+
+	if err := s.SaveToFile(file); err != nil {
+		t.Fatalf("SaveToFile error: %v", err)
+	}
+
+	// Load into a new store 
+	s2 := NewStore()
+	if err := s2.LoadFromFile(file); err != nil {
+		t.Fatalf("LoadFromFile errir: %v", err)
+	}
+
+	val, ok := s2.Get("b")
+	if !ok || val != "hello" {
+		t.Fatalf("expected to get hello, got %v", val)
+	}
+
+	// should still have TTL metdata
+	_, ok = s2.Get("a")
+	if !ok {
+		t.Fatalf("expected key 'a' to exist after load")
 	}
 }

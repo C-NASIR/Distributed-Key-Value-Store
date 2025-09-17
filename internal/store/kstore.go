@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -186,4 +187,48 @@ func (s *Store) CAS(key, expected, newVal string) bool {
 	e.value = []byte(newVal)
 	s.data[key] = e
 	return true
+}
+
+type persistedEntry struct {
+	Value []byte `json:"value"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (s *Store) SaveToFile(filename string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make(map[string]persistedEntry)
+	for k, e := range s.data {
+		out[k] = persistedEntry {
+			Value: e.value,
+			ExpiresAt: e.expiresAt,
+		}
+	}
+
+	data, err := json.MarshalIndent(out, "", " ")
+	if err != nil {
+		return  err
+	}
+	return os.WriteFile(filename, data, 0644)
+}
+
+func (s *Store) LoadFromFile(filename string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return  err
+	}
+
+	var loaded map[string]persistedEntry
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		return err
+	}
+
+	for k, v := range loaded {
+		s.data[k] = entry{value: v.Value, expiresAt: v.ExpiresAt}
+	}
+	return  nil
 }
