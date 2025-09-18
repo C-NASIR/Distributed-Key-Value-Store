@@ -40,7 +40,7 @@ func TestDelete(t *testing.T) {
 
 	s.Set("foo", "bar")
 
-	deleted := s.Delete("foo")
+	deleted := s.Del("foo")
 	if !deleted {
 		t.Fatalf("expected key to be deleted")
 	}
@@ -51,7 +51,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	// Try deleting a non-existent key 
-	deleted = s.Delete("no-there")
+	deleted = s.Del("no-there")
 	if deleted {
 		t.Fatalf("expected false when deleting non-existent key")
 	}

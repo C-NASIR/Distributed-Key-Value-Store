@@ -82,7 +82,7 @@ func (s *Store) GetObject(key string, target any) (bool, error) {
 	return true, nil
 }
 
-func (s *Store) Delete(key string) bool {
+func (s *Store) Del(key string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.data[key]; exists {
